@@ -8,7 +8,7 @@
 **  PA0 = T0, PA1 = T1
 **
 **  LEDs:
-**  PA4 = Led_Verde, PA5 = Led_Amarelo
+**  PA5 = Led_Verde, PA4 = Led_Amarelo
 **
 **  Buzzer:
 **  PA6 = BZ0
@@ -40,10 +40,12 @@
 
 #define us 0
 #define ds 1
-/* Private variables */
-uint16_t cathode[]={cathode_0,cathode_1,cathode_2,cathode_3,cathode_4,cathode_5,cathode_6,cathode_7,cathode_8,cathode_9};
 
+/* Private variables */
+
+uint16_t cathode[]={cathode_0,cathode_1,cathode_2,cathode_3,cathode_4,cathode_5,cathode_6,cathode_7,cathode_8,cathode_9};
 uint16_t seletor[]={GPIO_ODR_ODR_0,GPIO_ODR_ODR_1};
+
 /* Private function prototypes */
 /* Private functions */
 
@@ -55,19 +57,12 @@ uint16_t seletor[]={GPIO_ODR_ODR_0,GPIO_ODR_ODR_1};
 **===========================================================================
 */
 
-/*Sorteia valores aleatórios entre [0,7] para as posições [0,7] de vetor[]
- *{Explode a posição que tiver o valor 0}
- *{Desarma a posição que tiver o valor 1}
- * Faz varredura para ver se a posição que está com a bomba ou desarmar está com seu fio ligado ou não
- * {para isso, será um laço for}
- *
- */
 int main(void)
 {
 	srand(time(NULL));
 	uint16_t TEMPO_TROCA=1000;
 	uint16_t wire[8];
-	uint16_t vetor[8];
+	int vetor[9];
 	uint16_t display[2],valor[2]={9,9};
 	uint16_t FtimerS=0, timerMs=0,Buzzer=0;
 	uint16_t button=0x0;
@@ -77,10 +72,10 @@ int main(void)
 	//Enabling GPIOS clock
 		RCC->AHB1ENR|=0x87;
 
-	//Enabling TIM10 clock
+	//Enabling TIM10 & TIM11 clock
 		RCC->APB2ENR|=RCC_APB2ENR_TIM10EN;
 
-	//Setting UIF overflow time
+	//Setting TIM10 UIF overflow time
 		TIM10->PSC = 9;
 		TIM10->ARR = ARR_boss;
 		TIM10->CR1|=TIM_CR1_CEN;//starts
@@ -93,8 +88,9 @@ int main(void)
 	    GPIOB->MODER|=(GPIO_MODER_MODER0_0|GPIO_MODER_MODER1_0|GPIO_MODER_MODER2_0|GPIO_MODER_MODER3_0|GPIO_MODER_MODER4_0|GPIO_MODER_MODER5_0|GPIO_MODER_MODER6_0);//controla os segmentos dos catodos
     //habilita os pinos do GPIOC como entradas digitais
 	    GPIOC->MODER &=~ (GPIO_MODER_MODER0|GPIO_MODER_MODER1|GPIO_MODER_MODER2|GPIO_MODER_MODER3|GPIO_MODER_MODER4|GPIO_MODER_MODER5|GPIO_MODER_MODER6|GPIO_MODER_MODER7|GPIO_MODER_MODER8);
-	//habilitando pull down do GPIOC
-	    GPIOC->PUPDR|=(GPIO_MODER_MODER0_1|GPIO_MODER_MODER1_1|GPIO_MODER_MODER2_1|GPIO_MODER_MODER3_1|GPIO_MODER_MODER4_1|GPIO_MODER_MODER5_1|GPIO_MODER_MODER6_1|GPIO_MODER_MODER7_1);
+	//habilitando pull up do GPIOC
+	    GPIOC->PUPDR &=~ (GPIO_MODER_MODER0|GPIO_MODER_MODER1|GPIO_MODER_MODER2|GPIO_MODER_MODER3|GPIO_MODER_MODER4|GPIO_MODER_MODER5|GPIO_MODER_MODER6|GPIO_MODER_MODER7|GPIO_MODER_MODER8);
+	    GPIOC->PUPDR|=(GPIO_MODER_MODER0_0|GPIO_MODER_MODER1_0|GPIO_MODER_MODER2_0|GPIO_MODER_MODER3_0|GPIO_MODER_MODER4_0|GPIO_MODER_MODER5_0|GPIO_MODER_MODER6_0|GPIO_MODER_MODER7_0|GPIO_MODER_MODER8_1);
 
   /* Infinite loop */
   while (1)
@@ -119,72 +115,65 @@ int main(void)
 
 	  TIM10->ARR=ARR_boss;
 
-	  if(button == 0x100){//START
+	  if(button == 0x100){//START/RESET
 		  start=1;
 		  ARR_boss=1599;
 		  valor[us] = 9;
 	  	  valor[ds] = 5;
 	  	  GPIOA->ODR&=~0x70;
-	  	  for(int a=0;a<8;a++){//lógica de reset dos testes
-	  		  //vetor[a]=a;
-	  		  teste[a]=0;
-	  	  }
 	  	  for(int c=0;c<8;c++){//gerador de valores aleatórios para vetor[]
-	  		  vetor[c]=rand()%8;
-	  	  	  for(int d=0;d<c;d++){//verificador de repetição
-	  	  		if(vetor[d] == vetor[c])
-	  	  		{
-	  	  			vetor[c] = rand()%8;
+	  		teste[c]=0;//reset dos testes
+	  		vetor[c]=rand()%7;
+	  		for(int d=0;d<c;d++){//verificador de repetição
+	  			if(vetor[d] == vetor[c]){
+	  				vetor[c] = rand()%7;//resorteia em caso de repetição
 	  	  			d=0;
 	  	  		}
-	  	  	  }
+	  		}
 	  	  }
-	  }
-
-	  if(TIM10->SR&TIM_SR_UIF){						//verifica o overflow
-		  TIM10->SR &=~ TIM_SR_UIF;				 	//zera o contador de tempo
+	  }//FIM BOTAO
+	  if(TIM10->SR&TIM_SR_UIF){//verifica o overflow
+		  TIM10->SR &=~ TIM_SR_UIF;//zera o contador de tempo
 		  timerMs++;
-		  if(timerMs == TEMPO_TROCA){		    	//avisa overflow do timerMs
+		  if(start==1){//bip do buzzer a cada mudança de valor no display
+			  if(timerMs > (4*(TEMPO_TROCA/5)))
+				  GPIOA->ODR|=0x40;
+			  else
+				  GPIOA->ODR&=~0x40;
+		  }
+		  else
+			  GPIOA->ODR&=~0x40;
+		  if(timerMs == TEMPO_TROCA){//avisa overflow do timerMs
 			  timerMs = 0;
 		 	  FtimerS = 1;
-			  if(valor[us] == 0&&valor[ds] == 0){
-				  if(Buzzer==0){
-					  GPIOA->ODR|=0x40;
-					  Buzzer=1;
-				  }
-				  else{
-					  GPIOA->ODR&=~0x40;
-					  Buzzer=0;
-				  }
-			  }
 		  }
 		  if(i==0)i=1;
 		  else i=0;
-		  //lógica dos fios
-		  for(int b=0;b<8;b++){
+		  for(int b=0;b<8;b++){//lógica dos fios
 			  if(wire[b]==0x0&&(vetor[b+1]==0||vetor[b-1]==0))
+				  GPIOA->ODR|=0x10;
+			  else if(wire[7]==0x0&&vetor[0]==0)
+				  GPIOA->ODR|=0x10;
+			  else if(wire[0]==0x0&&vetor[7]==0)
 				  GPIOA->ODR|=0x10;
 			  if(wire[b]==0x0&&(vetor[b+1]==1||vetor[b-1]==1))
 			  	  GPIOA->ODR|=0x20;
-			  if(wire[7]==0x0&&vetor[0]==0)
-				  GPIOA->ODR|=0x10;
-			  if(wire[7]==0x0&&vetor[0]==1)
+			  else if(wire[7]==0x0&&vetor[0]==1)
 				  GPIOA->ODR|=0x20;
-			  if(wire[0]==0x0&&vetor[7]==0)
-				  GPIOA->ODR|=0x10;
-			  if(wire[0]==0x0&&vetor[7]==1)
+			  else if(wire[0]==0x0&&vetor[7]==1)
 				  GPIOA->ODR|=0x20;
-			  if(wire[b]==0x0&&vetor[b]==0){
+			  if(wire[b]==0x0&&vetor[b]==0){//explode a bomba
 				  valor[us] = 0;
 				  valor[ds] = 0;
 				  start=0;
+				  GPIOA->ODR&=~0x40;
 			  }
-			  if(wire[b]==0x0&&vetor[b]==1){
+			  if(wire[b]==0x0&&vetor[b]==1){//desarma a bomba
 				  valor[us] = 0;
 				  valor[ds] = 6;
 				  start=0;
 			  }
-			  if(wire[b]==0&&teste[0]==0&&vetor[b]==2){
+			  if(wire[b]==0&&teste[0]==0&&vetor[b]==2){//acelera
 				  teste[0]=1;
 			  	  ARR_boss/=1.5;
 			  }
@@ -208,17 +197,18 @@ int main(void)
 				  teste[5]=1;
 			  	  ARR_boss/=1.5;
 			  }
-		  }
+		  }//fim lógica dos fios
+	  }//fim TIM10
+	  if(valor[us] == 0&&valor[ds] == 0){//explode a bomba por ter acabado tempo
+		  if(Buzzer==0)GPIOA->ODR|=0x40;
 	  }
-
-	  if(start==1){
+	  if(start==1){//inicia ao apertar botao
 		  if(FtimerS){
-			  FtimerS = 0;
-			  if(valor[us] > 0)
-				  valor[us]--;
-			  else if(valor[us] == 0){
-				  if (valor[ds] > 0){
-					  valor[us] = 9;
+			  FtimerS=0;
+			  if(valor[us]>0)valor[us]--;//contador decrescente de 59s
+			  else if(valor[us]==0){
+				  if (valor[ds]>0){
+					  valor[us]=9;
 					  valor[ds]--;
 				  }
 			  }
